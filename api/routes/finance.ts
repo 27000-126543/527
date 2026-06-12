@@ -89,7 +89,15 @@ router.get('/reports', (req: Request, res: Response): void => {
   if (region) result = result.filter(r => r.region === region)
   if (month !== undefined) result = result.filter(r => r.month === month)
   if (year !== undefined) result = result.filter(r => r.year === year)
-  res.json({ success: true, data: result })
+  const converted = result.map(r => ({
+    ...r,
+    inspection_pass_rate: Math.round(r.inspection_pass_rate * 100),
+    complaint_resolution_rate: Math.round(r.complaint_resolution_rate * 100),
+  }))
+  const allMonths = Array.from(
+    new Set(monthlyReports.map(r => `${r.year}-${String(r.month).padStart(2, '0')}`))
+  ).sort().reverse()
+  res.json({ success: true, data: converted, available_months: allMonths })
 })
 
 export default router

@@ -74,7 +74,9 @@ export default function IPOwnerComplaints() {
       const res = await fetch(`/api/ip-owner/match?certificate_id=${selectedCertId}`);
       const data = await res.json();
       if (data.success) {
-        setMatchedProducts(data.data ?? []);
+        const payload = data.data;
+        const products = Array.isArray(payload) ? payload : (payload?.matched_products ?? []);
+        setMatchedProducts(products);
         setSelectedProductIds(new Set());
         setStep(2);
       } else {

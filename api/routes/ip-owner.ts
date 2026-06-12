@@ -19,8 +19,9 @@ router.get('/certificates', (req: Request, res: Response): void => {
 })
 
 router.post('/certificates', (req: Request, res: Response): void => {
-  const { owner_id, type, document, description } = req.body
-  if (!owner_id || !type || !document || !description) {
+  const { owner_id, type, document, document_name, description } = req.body
+  const finalDocument = document || document_name
+  if (!owner_id || !type || !finalDocument || !description) {
     res.status(400).json({ success: false, error: '缺少必填字段' })
     return
   }
@@ -38,7 +39,7 @@ router.post('/certificates', (req: Request, res: Response): void => {
     id: getNextCertificateId(),
     owner_id,
     type,
-    document,
+    document: finalDocument,
     description,
     status: 'active',
     created_at: new Date().toISOString(),
@@ -68,6 +69,7 @@ router.get('/complaints', (req: Request, res: Response): void => {
         certificate_type: cert?.type || '',
         certificate_description: cert?.description || '',
         matched_product_details: matchedProductDetails,
+        matched_products: confirmedProducts.length || matchedProducts.length,
         confirmed_count: confirmedProducts.length,
       }
     })
@@ -116,35 +118,69 @@ router.get('/match', (req: Request, res: Response): void => {
     return
   }
   const matchedIds = matchInfringingProducts(certificateId)
+  const typeLabel: Record<string, string> = {
+    trademark: '商标',
+    copyright: '著作权',
+    patent: '专利',
+  }
   const matchedProducts = matchedIds.map(pid => {
     const p = products.find(pr => pr.id === pid)
-    return p || { id: pid, title: '', status: '' }
+    const seller = p ? users.find(u => u.id === p.seller_id) : null
+    return {
+      id: pid,
+      product_name: p?.title || '',
+      seller_name: seller?.company_name || seller?.username || '',
+      match_reason: `与${typeLabel[cert.type] || cert.type}「${cert.description}」高度相似`,
+      status: p?.status || '',
+    }
   })
   res.json({ success: true, data: { certificate_id: certificateId, matched_products: matchedProducts } })
 })
 
 router.post('/confirm', (req: Request, res: Response): void => {
-  const { complaint_id, confirmed_products } = req.body
-  if (!complaint_id || !confirmed_products) {
-    res.status(400).json({ success: false, error: '缺少必填字段' })
-    return
-  }
-  const complaint = complaints.find(c => c.id === complaint_id)
+  const { complaint_id, confirmed_products, certificate_id, product_ids, owner_id, reason, description } = req.body
+  const finalConfirmed = confirmed_products || product_ids || []
+  let complaint = complaint_id ? complaints.find(c => c.id === complaint_id) : null
   if (!complaint) {
-    res.status(404).json({ success: false, error: '投诉不存在' })
-    return
+    if (!certificate_id || !owner_id) {
+      res.status(400).json({ success: false, error: '缺少complaint_id或(certificate_id + owner_id)' })
+      return
+    }
+    const cert = ipCertificates.find(c => c.id === certificate_id && c.owner_id === owner_id)
+    if (!cert) {
+      res.status(404).json({ success: false, error: '证书不存在或不属于该权利人' })
+      return
+    }
+    const newComplaint: Complaint = {
+      id: getNextComplaintId(),
+      certificate_id,
+      owner_id,
+      matched_products: JSON.stringify(finalConfirmed),
+      confirmed_products: JSON.stringify(finalConfirmed),
+      reason: reason || '涉嫌侵权',
+      description: description || '权利人发起侵权投诉',
+      status: 'notice_sent',
+      created_at: new Date().toISOString(),
+    }
+    complaints.push(newComplaint)
+    complaint = newComplaint
+  } else {
+    complaint.confirmed_products = JSON.stringify(finalConfirmed)
+    complaint.status = 'notice_sent'
   }
-  complaint.confirmed_products = JSON.stringify(confirmed_products)
-  complaint.status = 'confirmed'
-  for (const pid of confirmed_products) {
+  for (const pid of finalConfirmed) {
     const product = products.find(p => p.id === pid)
     if (product) {
       product.status = 'locked'
       product.infringement_flag = true
-      addNotification(product.seller_id, 'complaint', '侵权投诉通知', `您的商品"${product.title}"收到知识产权投诉，商品已被锁定`, complaint_id, 'complaint')
+      addNotification(product.seller_id, 'complaint', '侵权投诉通知', `您的商品"${product.title}"收到知识产权投诉，商品已被锁定，请及时申诉`, complaint.id, 'complaint')
     }
   }
-  addNotification(complaint.owner_id, 'complaint', '投诉已受理', `您发起的投诉#${complaint_id}已被确认，下架通知已发送`, complaint_id, 'complaint')
+  const reviewers = users.filter(u => u.role === 'reviewer')
+  for (const reviewer of reviewers) {
+    addNotification(reviewer.id, 'complaint', '新侵权投诉', `IP权利人发起侵权投诉#${complaint.id}，涉及${finalConfirmed.length}件商品，请审核`, complaint.id, 'complaint')
+  }
+  addNotification(complaint.owner_id, 'complaint', '投诉已受理', `您发起的投诉#${complaint.id}已确认，下架通知已发送至相关卖家`, complaint.id, 'complaint')
   res.json({ success: true, data: complaint })
 })
 

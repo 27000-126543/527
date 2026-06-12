@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, X, Loader2, Receipt } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
+import { useAuthStore } from '@/store/auth';
 
 interface RefundRequest {
   id: number;
@@ -14,6 +15,7 @@ interface RefundRequest {
 }
 
 export default function FinanceRefundApproval() {
+  const { user } = useAuthStore();
   const [requests, setRequests] = useState<RefundRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function FinanceRefundApproval() {
       const res = await fetch(`/api/finance/refund-requests/${id}/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: comments[id] ?? '' }),
+        body: JSON.stringify({ finance_id: user?.id, comment: comments[id] ?? '' }),
       });
       const data = await res.json();
       if (data.success) {

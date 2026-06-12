@@ -54,11 +54,24 @@ router.get('/tasks', (req: Request, res: Response): void => {
     .filter(p => p.inspector_id === inspectorId)
     .map(plan => {
       const product = products.find(p => p.id === plan.product_id)
+      const seller = product ? users.find(u => u.id === product.seller_id) : null
       const report = inspectionReports.find(r => r.plan_id === plan.id)
+      const statusMap: Record<string, string> = {
+        pending: 'assigned',
+        assigned: 'assigned',
+        sampling: 'in_progress',
+        completed: 'completed',
+      }
       return {
-        ...plan,
-        product_title: product?.title || '',
-        product_category: product?.category || '',
+        id: plan.id,
+        product_id: plan.product_id,
+        product_name: product?.title || '',
+        product_description: product?.description || '',
+        category: product?.category || '',
+        seller_name: seller?.company_name || seller?.username || '',
+        priority: plan.priority,
+        status: statusMap[plan.status] || plan.status,
+        assigned_date: plan.assigned_at || plan.created_at,
         report_result: report?.result || null,
       }
     })
@@ -131,12 +144,19 @@ router.post('/reports', (req: Request, res: Response): void => {
   plan.completed_at = new Date().toISOString()
   const product = products.find(p => p.id === plan.product_id)
   if (product) {
+    const seller = users.find(u => u.id === product.seller_id)
     if (result === 'unqualified') {
       product.status = 'delisted'
-      addNotification(product.seller_id, 'inspection', '商品抽检不合格', `您的商品"${product.title}"抽检不合格，商品已强制下架`, Number(planId), 'inspection')
+      if (seller) {
+        seller.reputation_score = Math.max(0, (seller.reputation_score || 0) - 10)
+      }
+      addNotification(product.seller_id, 'inspection', '商品抽检不合格', `您的商品"${product.title}"抽检不合格，商品已强制下架，信誉分扣减10分`, Number(planId), 'inspection')
     } else if (result === 'warning') {
       product.status = 'warning'
-      addNotification(product.seller_id, 'inspection', '商品抽检预警', `您的商品"${product.title}"抽检结果为预警，请关注`, Number(planId), 'inspection')
+      if (seller) {
+        seller.reputation_score = Math.max(0, (seller.reputation_score || 0) - 3)
+      }
+      addNotification(product.seller_id, 'inspection', '商品抽检预警', `您的商品"${product.title}"抽检结果为预警，信誉分扣减3分，请关注`, Number(planId), 'inspection')
     } else {
       addNotification(product.seller_id, 'inspection', '商品抽检完成', `您的商品"${product.title}"抽检结果为合格`, Number(planId), 'inspection')
     }
@@ -150,18 +170,38 @@ router.get('/history', (req: Request, res: Response): void => {
     res.status(400).json({ success: false, error: '缺少inspector_id参数' })
     return
   }
-  const history = inspectionReports
-    .filter(r => r.inspector_id === inspectorId)
-    .map(report => {
-      const plan = inspectionPlans.find(p => p.id === report.plan_id)
-      const product = plan ? products.find(p => p.id === plan.product_id) : null
-      return {
-        ...report,
-        product_title: product?.title || '',
-        product_category: product?.category || '',
+  const inspectorReports = inspectionReports.filter(r => r.inspector_id === inspectorId)
+  const totalCount = inspectorReports.length
+  const qualifiedCount = inspectorReports.filter(r => r.result === 'qualified').length
+  const warningCount = inspectorReports.filter(r => r.result === 'warning').length
+  const unqualifiedCount = inspectorReports.filter(r => r.result === 'unqualified').length
+  const passRate = totalCount > 0 ? Math.round((qualifiedCount / totalCount) * 100) : 0
+  const reports = inspectorReports.map(report => {
+    const plan = inspectionPlans.find(p => p.id === report.plan_id)
+    const product = plan ? products.find(p => p.id === plan.product_id) : null
+    return {
+      id: report.id,
+      product_name: product?.title || '',
+      category: product?.category || '',
+      result: report.result,
+      details: report.details,
+      report_file: report.report_file,
+      created_at: new Date(report.created_at).toLocaleDateString('zh-CN'),
+    }
+  })
+  res.json({
+    success: true,
+    data: {
+      reports,
+      stats: {
+        total_inspections: totalCount,
+        qualified_count: qualifiedCount,
+        warning_count: warningCount,
+        unqualified_count: unqualifiedCount,
+        pass_rate: passRate,
       }
-    })
-  res.json({ success: true, data: history })
+    }
+  })
 })
 
 export default router

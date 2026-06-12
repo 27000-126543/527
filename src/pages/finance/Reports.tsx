@@ -28,13 +28,15 @@ const years = Array.from({ length: 3 }, (_, i) => {
 
 export default function FinanceReports() {
   const [region, setRegion] = useState('华东');
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
-  const [year, setYear] = useState(String(currentYear));
+  const [month, setMonth] = useState('');
+  const [year, setYear] = useState('');
   const [data, setData] = useState<ReportData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   const fetchReports = async () => {
+    if (!initialized) return;
     setLoading(true);
     setError(null);
     try {
@@ -52,9 +54,39 @@ export default function FinanceReports() {
     }
   };
 
+  const initializeDefaultMonth = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/finance/reports');
+      const result = await res.json();
+      if (result.success) {
+        const months: string[] = result.available_months ?? [];
+        if (months.length > 0) {
+          const latest = months[0];
+          const [y, m] = latest.split('-');
+          setYear(y);
+          setMonth(String(Number(m)));
+        } else {
+          setYear(String(new Date().getFullYear()));
+          setMonth(String(new Date().getMonth() + 1));
+        }
+      }
+    } catch {
+      setYear(String(new Date().getFullYear()));
+      setMonth(String(new Date().getMonth() + 1));
+    } finally {
+      setInitialized(true);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    initializeDefaultMonth();
+  }, []);
+
   useEffect(() => {
     fetchReports();
-  }, [region, month, year]);
+  }, [region, month, year, initialized]);
 
   const barChartData = data.map((d) => ({
     name: d.region,
@@ -157,7 +189,7 @@ export default function FinanceReports() {
                   {data.map((d, idx) => (
                     <tr key={idx} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">{d.region}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{d.month}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{Number(d.month)}月</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{d.seller_count}</td>
                       <td className="px-6 py-4 text-sm text-emerald font-medium">{d.inspection_pass_rate}%</td>
                       <td className="px-6 py-4 text-sm text-amber font-medium">{d.complaint_resolution_rate}%</td>

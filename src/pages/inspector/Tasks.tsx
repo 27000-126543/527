@@ -42,9 +42,21 @@ export default function InspectorTasks() {
         const res = await fetch(`/api/inspector/tasks?inspector_id=${user?.id}`);
         const data = await res.json();
         if (data.success) {
-          setTasks(data.data);
-          if (data.data.length > 0) {
-            setSelected(data.data[0]);
+          const raw = data.data ?? [];
+          const mapped: InspectionTask[] = raw.map((t: Record<string, unknown>) => ({
+            id: Number(t.id),
+            product_id: Number(t.product_id),
+            product_name: String(t.product_name ?? ''),
+            category: String(t.category ?? ''),
+            priority: String(t.priority ?? 'normal'),
+            status: (t.status as InspectionTask['status']) ?? 'assigned',
+            assigned_date: t.assigned_date ? new Date(String(t.assigned_date)).toLocaleDateString('zh-CN') : '',
+            product_description: String(t.product_description ?? ''),
+            seller_name: String(t.seller_name ?? ''),
+          }));
+          setTasks(mapped);
+          if (mapped.length > 0) {
+            setSelected(mapped[0]);
           }
         } else {
           setError(data.error || '获取任务失败');

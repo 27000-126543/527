@@ -34,6 +34,19 @@ app.use('/api/ip-owner', ipOwnerRoutes)
 app.use('/api/finance', financeRoutes)
 app.use('/api/notifications', notificationRoutes)
 
+app.get('/api/products', (req: Request, res: Response): void => {
+  import('./db.js').then(({ products, users }) => {
+    const data = products.map(p => {
+      const seller = users.find((u: any) => u.id === p.seller_id)
+      return {
+        ...p,
+        seller_name: seller?.company_name || seller?.username || '',
+      }
+    })
+    res.json({ success: true, data })
+  })
+})
+
 app.use(
   '/api/health',
   (req: Request, res: Response, next: NextFunction): void => {
