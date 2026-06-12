@@ -179,10 +179,13 @@ router.get('/history', (req: Request, res: Response): void => {
   const reports = inspectorReports.map(report => {
     const plan = inspectionPlans.find(p => p.id === report.plan_id)
     const product = plan ? products.find(p => p.id === plan.product_id) : null
+    const seller = product ? users.find(u => u.id === product.seller_id) : null
     return {
       id: report.id,
       product_name: product?.title || '',
       category: product?.category || '',
+      seller_name: seller?.company_name || seller?.username || '',
+      assigned_date: plan?.assigned_at || plan?.created_at || '',
       result: report.result,
       details: report.details,
       report_file: report.report_file,

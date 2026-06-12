@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import {
-  users, ipCertificates, complaints, products,
+  users, ipCertificates, complaints, products, appeals,
   getNextCertificateId, getNextComplaintId,
   matchInfringingProducts, addNotification,
 } from '../db.js'
@@ -15,7 +15,11 @@ router.get('/certificates', (req: Request, res: Response): void => {
     return
   }
   const ownerCerts = ipCertificates.filter(c => c.owner_id === ownerId)
-  res.json({ success: true, data: ownerCerts })
+  const enriched = ownerCerts.map(c => ({
+    ...c,
+    document_name: c.document,
+  }))
+  res.json({ success: true, data: enriched })
 })
 
 router.post('/certificates', (req: Request, res: Response): void => {
@@ -64,6 +68,26 @@ router.get('/complaints', (req: Request, res: Response): void => {
         const p = products.find(pr => pr.id === pid)
         return p ? { id: p.id, title: p.title, status: p.status } : { id: pid, title: '', status: '' }
       })
+      const complaintAppeals = appeals.filter(a => a.complaint_id === c.id)
+      const timeline: Array<{ status: string; label: string; time: string }> = []
+      const createdAt = new Date(c.created_at)
+      timeline.push({ status: 'pending', label: '投诉创建，等待处理', time: createdAt.toISOString() })
+      if (c.status === 'notice_sent' || c.status === 'appealed' || c.status === 'resolved') {
+        const noticeTime = new Date(createdAt.getTime() + 30 * 60 * 1000)
+        timeline.push({ status: 'notice_sent', label: '已向卖家发送下架通知', time: noticeTime.toISOString() })
+      }
+      const ongoingAppeal = complaintAppeals.find(a => a.status === 'under_review')
+      const resolvedAppeal = complaintAppeals.find(a => a.status === 'upheld' || a.status === 'rejected')
+      if (c.status === 'appealed' || ongoingAppeal) {
+        const appealTime = ongoingAppeal ? new Date(ongoingAppeal.created_at) : new Date(createdAt.getTime() + 3 * 24 * 60 * 60 * 1000)
+        timeline.push({ status: 'appealed', label: '卖家已提起申诉，等待仲裁', time: appealTime.toISOString() })
+      }
+      if (c.status === 'resolved' || resolvedAppeal) {
+        const resolveTime = resolvedAppeal ? new Date(resolvedAppeal.created_at) : new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+        const label = resolvedAppeal?.status === 'rejected' ? '申诉已驳回，投诉成立，商品永久下架' :
+                      resolvedAppeal?.status === 'upheld' ? '申诉成立，商品已解除锁定' : '投诉已处理完成'
+        timeline.push({ status: 'resolved', label, time: resolveTime.toISOString() })
+      }
       return {
         ...c,
         certificate_type: cert?.type || '',
@@ -71,6 +95,7 @@ router.get('/complaints', (req: Request, res: Response): void => {
         matched_product_details: matchedProductDetails,
         matched_products: confirmedProducts.length || matchedProducts.length,
         confirmed_count: confirmedProducts.length,
+        timeline,
       }
     })
   res.json({ success: true, data: ownerComplaints })

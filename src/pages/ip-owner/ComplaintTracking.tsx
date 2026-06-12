@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, TrendingUp, Clock, CheckCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, TrendingUp, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import StatusBadge, { StatusType } from '@/components/StatusBadge';
 
@@ -27,9 +27,16 @@ const typeLabels: Record<string, string> = {
 
 const timelineIcons: Record<string, React.ElementType> = {
   pending: Clock,
+  notice_sent: TrendingUp,
+  appealed: AlertCircle,
+  under_review: Clock,
   assigned: TrendingUp,
   completed: CheckCircle,
   approved: CheckCircle,
+  upheld: CheckCircle,
+  resolved: CheckCircle,
+  arbitrated: CheckCircle,
+  rejected: CheckCircle,
 };
 
 export default function IPOwnerComplaintTracking() {

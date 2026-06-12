@@ -31,10 +31,13 @@ export default function IPOwnerDashboard() {
         const complaintsData = await complaintsRes.json();
         const complaints: Array<{ status: string }> = complaintsData.success ? (complaintsData.data ?? []) : [];
 
+        const ongoing = ['notice_sent', 'appealed', 'pending', 'assigned', 'under_review', 'arbitration_pending'];
+        const resolved = ['resolved', 'completed', 'approved', 'upheld', 'rejected', 'arbitrated'];
+
         setStats({
           certificate_count: certCount,
-          ongoing_complaints: complaints.filter((c) => c.status === 'pending' || c.status === 'assigned').length,
-          resolved_complaints: complaints.filter((c) => c.status === 'completed' || c.status === 'approved').length,
+          ongoing_complaints: complaints.filter((c) => ongoing.includes(c.status)).length,
+          resolved_complaints: complaints.filter((c) => resolved.includes(c.status)).length,
         });
       } catch {
         // silently fail

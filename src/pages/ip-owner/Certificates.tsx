@@ -7,6 +7,7 @@ interface Certificate {
   id: number;
   type: 'trademark' | 'patent' | 'copyright';
   description: string;
+  document: string;
   document_name: string;
   status: string;
   created_at: string;
@@ -158,6 +159,7 @@ export default function IPOwnerCertificates() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <th className="text-left text-xs font-medium text-gray-500 px-6 py-3">类型</th>
+                <th className="text-left text-xs font-medium text-gray-500 px-6 py-3">权利证明文件</th>
                 <th className="text-left text-xs font-medium text-gray-500 px-6 py-3">描述</th>
                 <th className="text-left text-xs font-medium text-gray-500 px-6 py-3">状态</th>
                 <th className="text-left text-xs font-medium text-gray-500 px-6 py-3">上传日期</th>
@@ -172,7 +174,8 @@ export default function IPOwnerCertificates() {
                       {typeLabels[cert.type] ?? cert.type}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 max-w-[300px] truncate">{cert.description}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 font-medium">{cert.document || cert.document_name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 max-w-[250px] truncate">{cert.description}</td>
                   <td className="px-6 py-4"><StatusBadge status={cert.status as StatusType} /></td>
                   <td className="px-6 py-4 text-sm text-gray-500">{new Date(cert.created_at).toLocaleDateString('zh-CN')}</td>
                 </tr>

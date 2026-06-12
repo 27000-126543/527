@@ -10,6 +10,8 @@ interface InspectionReport {
   details: string;
   created_at: string;
   category: string;
+  seller_name: string;
+  assigned_date: string;
 }
 
 interface ReportStats {
@@ -132,6 +134,8 @@ export default function InspectorReports() {
                 <tr className="border-b border-gray-100">
                   <th className="text-left py-3 px-4 font-medium text-slate">商品名称</th>
                   <th className="text-left py-3 px-4 font-medium text-slate">分类</th>
+                  <th className="text-left py-3 px-4 font-medium text-slate">商家</th>
+                  <th className="text-left py-3 px-4 font-medium text-slate">任务分配时间</th>
                   <th className="text-left py-3 px-4 font-medium text-slate">检测结果</th>
                   <th className="text-left py-3 px-4 font-medium text-slate">检测详情</th>
                   <th className="text-left py-3 px-4 font-medium text-slate">日期</th>
@@ -142,6 +146,10 @@ export default function InspectorReports() {
                   <tr key={report.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="py-3 px-4 font-medium text-gray-900">{report.product_name}</td>
                     <td className="py-3 px-4 text-gray-600">{report.category}</td>
+                    <td className="py-3 px-4 text-gray-600">{report.seller_name}</td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {report.assigned_date ? new Date(report.assigned_date).toLocaleDateString('zh-CN') : '-'}
+                    </td>
                     <td className="py-3 px-4">
                       <StatusBadge status={report.result} />
                     </td>
